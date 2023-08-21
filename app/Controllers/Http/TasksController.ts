@@ -10,14 +10,12 @@ export default class TasksController {
         isFinished: schema.boolean.optional()
     })
 
-
     /* Get all tasks */
     public async index(){
         return Task.all()
     }
 
     /** Create a new task */
-
     public async store({request, response}: HttpContextContract) {
         try {
             const payload = await request.validate({schema: this.validationSchema})
@@ -64,4 +62,15 @@ export default class TasksController {
         }
     }
 
+    public async destroy({ response, params }: HttpContextContract) {
+        try {
+            const task = await Task.findOrFail(params.id);
+
+            await task.delete();
+
+            return response.status(200).send('Task Deleted');
+        } catch {
+            return response.status(404).send('Task not found');
+        }
+    }
 }

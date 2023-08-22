@@ -19,13 +19,21 @@
 */
 
 import Route from '@ioc:Adonis/Core/Route'
+// import UsersController from 'App/Controllers/Http/UsersController'
 // import TasksController from 'App/Controllers/Http/TasksController'
 
 Route.get('/', 'HomeController.index')
+Route.group(() => {
+    // User routes
+    Route.post('/register', 'UsersController.register')
+    Route.post('/login', 'UsersController.login').middleware('guest')
+}).prefix('api')
 
 Route.group(() => {
+  // Tasks routes
   Route.get('/tasks', 'TasksController.index')
   Route.post('/tasks', 'TasksController.store')
   Route.patch('/tasks/:id', 'TasksController.update')
   Route.delete('/tasks/:id', 'TasksController.destroy')
-}).prefix('api')
+  Route.get('/tasks/:id', 'TasksController.show')
+}).prefix('api').middleware('auth')

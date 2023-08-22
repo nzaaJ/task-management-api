@@ -4,25 +4,43 @@ import Task from "App/Models/Task"
 
 export default class TasksController {
     
-    private validationSchema = schema.create({
+    // validator for store method
+    private storeValidationSchema = schema.create({
         taskName: schema.string({}, [rules.required()]),
         taskDescription: schema.string.optional(),
         isFinished: schema.boolean.optional()
     })
+    
+    // validator for update method
+    private updateValidationSchema = schema.create({
+        taskName: schema.string.optional(),
+        taskDescription: schema.string.optional(),
+        isFinished: schema.boolean.optional(),
+    });
 
     /* Get all tasks */
     public async index(){
         return Task.all()
     }
 
-    /** Create a new task */
+    /** Get task by ID */
+    public async show({response, params}){
+        try {
+            const task = await Task.findOrFail(params.id)
+
+            return response.status(200).json({ task })
+        } catch {
+            return response.status(404).send('Task not found')
+        }
+    }
+
+    /*** Create a new task */
     public async store({request, response}: HttpContextContract) {
         try {
-            const payload = await request.validate({schema: this.validationSchema})
+            const payload = await request.validate({schema: this.storeValidationSchema})
 
             const task = new Task()
 
-            // const {taskName, taskDescription} = request.all()
             task.taskName = payload.taskName
             task.taskDescription = payload.taskDescription as string
 
@@ -30,18 +48,18 @@ export default class TasksController {
 
             return response.status(201).send('Task Created')
         } catch {
-            return response.status(400).send('Bad Request: The field "taskName" is not nullable')
+            return response.status(400).send('Bad Request: Invalid input data')
         }
     } 
 
-    /** Update a task by ID */
+    /**** Update a task by ID */
     public async update({request, response, params}: HttpContextContract) {
         try {
-            const payload = await request.validate({schema: this.validationSchema})
+            const payload = await request.validate({schema: this.updateValidationSchema})
 
+            
             const task = await Task.findOrFail(params.id)
-        
-            // const {taskName, taskDescription, isFinished} = request.all()
+
             if(payload.taskName !== undefined){
                 task.taskName = payload.taskName
             }
@@ -54,23 +72,28 @@ export default class TasksController {
                 task.isFinished = payload.isFinished
             }
 
+            //if any field is updated, save task
             await task.save()
 
             return response.status(200).json({ task })
         } catch {
+            // if(error.messages){
+            //     return response.status(400).json({errors: error.messages})
+            // }
             return response.status(404).send('Task not found')
         }
     }
 
+    /***** Delete task by ID */
     public async destroy({ response, params }: HttpContextContract) {
         try {
-            const task = await Task.findOrFail(params.id);
+            const task = await Task.findOrFail(params.id)
 
-            await task.delete();
+            await task.delete()
 
-            return response.status(200).send('Task Deleted');
+            return response.status(200).send('Task Deleted')
         } catch {
-            return response.status(404).send('Task not found');
+            return response.status(404).send('Task not found')
         }
     }
 }

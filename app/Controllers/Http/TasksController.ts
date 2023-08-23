@@ -19,81 +19,127 @@ export default class TasksController {
     });
 
     /* Get all tasks */
-    public async index(){
-        return Task.all()
+    public async index({ response, auth }){
+        await auth.authenticate()
+
+        const user = auth.user
+        if(!user) {
+            return response.status(401).json({ error: 'Unauthorized access' })
+        }
+
+        try {
+            const tasks = await Task.query()
+                                .where('user_id', user.id)
+                                .select(['id', 'task_name', 'task_description', 'is_finished', 'created_at', 'updated_at'])
+            return tasks
+        } catch {
+            return response.status(500).json({ error: 'Internal Server Error' })
+        }
     }
 
     /** Get task by ID */
-    public async show({response, params}){
-        try {
-            const task = await Task.findOrFail(params.id)
+    public async show({ response, auth, params }){
+        await auth.authenticate()
 
+        const user = auth.user
+        if(!user) {
+            return response.status(401).json({ error: 'Unauthorized access' })
+        }
+
+        try {
+            const task = await Task.query()
+                                    .where('id', params.id)
+                                    .where('user_id', user.id)
+                                    .select(['id', 'task_name', 'task_description', 'is_finished', 'created_at', 'updated_at'])
+                                    .firstOrFail()
             return response.status(200).json({ task })
         } catch {
-            return response.status(404).send('Task not found')
+            return response.status(404).json({ error: 'Task not found' })
         }
     }
 
     /*** Create a new task */
-    public async store({request, response}: HttpContextContract) {
-        try {
-            const payload = await request.validate({schema: this.storeValidationSchema})
+    public async store({ request, response, auth }: HttpContextContract) {
+        const user = await auth.authenticate()
+        const payload = await request.validate({schema: this.storeValidationSchema})
 
+        try {
             const task = new Task()
 
             task.taskName = payload.taskName
             task.taskDescription = payload.taskDescription as string
+            task.isFinished = payload.isFinished || false
 
-            await task.save()
+            await user.related('tasks').save(task)
 
-            return response.status(201).send('Task Created')
+            return response.status(201).json({ message: 'Task Created' })
         } catch {
-            return response.status(400).send('Bad Request: Invalid input data')
+            return response.status(400).json({ error : 'Invalid input data'})
         }
     } 
 
     /**** Update a task by ID */
-    public async update({request, response, params}: HttpContextContract) {
+    public async update({ request, response, params, auth }: HttpContextContract) {
+        await auth.authenticate()
+
+        const payload = await request.validate({schema: this.updateValidationSchema})
+
+        const user = auth.user
+        if(!user) {
+            return response.status(401).json({ error: 'Unauthorized access' })
+        }
+
         try {
-            const payload = await request.validate({schema: this.updateValidationSchema})
+            const task = await Task.query().where('id', params.id).where('user_id', user.id).firstOrFail()
+            const originalTask = task.serialize()
 
-            
-            const task = await Task.findOrFail(params.id)
+            task.taskName = payload.taskName ?? task.taskName
+            task.taskDescription = payload.taskDescription ?? task.taskDescription
+            task.isFinished = payload.isFinished ?? task.isFinished
 
-            if(payload.taskName !== undefined){
-                task.taskName = payload.taskName
-            }
-
-            if(payload.taskDescription !== undefined){
-                task.taskDescription = payload.taskDescription
-            }
-
-            if(payload.isFinished !== undefined){
-                task.isFinished = payload.isFinished
-            }
-
-            //if any field is updated, save task
             await task.save()
 
-            return response.status(200).json({ task })
+            // check for changes after saving
+            const updatedFields = {}
+            if(payload.taskName !== originalTask.taskName){
+                updatedFields['taskName'] = task.taskName
+            }
+
+            if(payload.taskDescription !== originalTask.taskDescription){
+                updatedFields['taskDescription'] = task.taskDescription
+            }
+
+            if(payload.isFinished !== originalTask.isFinished){
+                updatedFields['isFinished'] = task.isFinished
+            }
+
+            if (Object.keys(updatedFields).length > 0) {
+                return response.status(200).json({ updatedFields }) // Return only updated fields
+            } else {
+                return response.status(200).json({ message: 'No changes were made to the task' })
+            }
+
         } catch {
-            // if(error.messages){
-            //     return response.status(400).json({errors: error.messages})
-            // }
-            return response.status(404).send('Task not found')
+            return response.status(404).json({ error: 'Task not found' })
         }
     }
 
     /***** Delete task by ID */
-    public async destroy({ response, params }: HttpContextContract) {
-        try {
-            const task = await Task.findOrFail(params.id)
+    public async destroy({ response, params, auth }: HttpContextContract) {
+        await auth.authenticate()
+        
+        const user = auth.user
+        if(!user) {
+            return response.json({ error: 'Unauthorized access' })
+        }
 
+        try {
+            const task = await Task.query().where('id', params.id).where('user_id', user.id).firstOrFail()
             await task.delete()
 
-            return response.status(200).send('Task Deleted')
+            return response.status(200).json({ message: 'Task Deleted' })
         } catch {
-            return response.status(404).send('Task not found')
+            return response.status(404).json({ error: 'Task not found'})
         }
     }
 }

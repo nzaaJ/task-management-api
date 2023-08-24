@@ -11,9 +11,6 @@ export default class extends BaseSchema {
       table.boolean('is_finished').defaultTo(false)
 
       table.integer('user_id').unsigned().references('id').inTable('users').onDelete('CASCADE')
-      /**
-       * Uses timestamptz for PostgreSQL and DATETIME2 for MSSQL
-       */
       table.timestamp('created_at', { useTz: true })
       table.timestamp('updated_at', { useTz: true })
     })

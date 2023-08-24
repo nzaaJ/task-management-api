@@ -1,22 +1,8 @@
 import type { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
-import { schema, rules } from '@ioc:Adonis/Core/Validator'
+import TaskValidator from 'App/Validators/TaskValidator'
 import Task from "App/Models/Task"
 
 export default class TasksController {
-    
-    // validator for store method
-    private storeValidationSchema = schema.create({
-        taskName: schema.string({}, [rules.required()]),
-        taskDescription: schema.string.optional(),
-        isFinished: schema.boolean.optional()
-    })
-    
-    // validator for update method
-    private updateValidationSchema = schema.create({
-        taskName: schema.string.optional(),
-        taskDescription: schema.string.optional(),
-        isFinished: schema.boolean.optional(),
-    });
 
     /* Get all tasks */
     public async index({ response, auth }){
@@ -61,7 +47,10 @@ export default class TasksController {
     /*** Create a new task */
     public async store({ request, response, auth }: HttpContextContract) {
         const user = await auth.authenticate()
-        const payload = await request.validate({schema: this.storeValidationSchema})
+        const payload = await request.validate({
+            schema: TaskValidator.storeSchema,
+            messages: TaskValidator.messages
+        })
 
         try {
             const task = new Task()
@@ -74,15 +63,17 @@ export default class TasksController {
 
             return response.status(201).json({ message: 'Task Created' })
         } catch {
-            return response.status(400).json({ error : 'Invalid input data'})
+            return response.status(400).json({ errors: 'Task not found' })
         }
     } 
 
     /**** Update a task by ID */
     public async update({ request, response, params, auth }: HttpContextContract) {
         await auth.authenticate()
-
-        const payload = await request.validate({schema: this.updateValidationSchema})
+        const payload = await request.validate({
+            schema: TaskValidator.updateSchema,
+            messages: TaskValidator.messages
+        })
 
         const user = auth.user
         if(!user) {
@@ -90,7 +81,10 @@ export default class TasksController {
         }
 
         try {
-            const task = await Task.query().where('id', params.id).where('user_id', user.id).firstOrFail()
+            const task = await Task.query()
+                                    .where('id', params.id)
+                                    .where('user_id', user.id)
+                                    .firstOrFail()
             const originalTask = task.serialize()
 
             task.taskName = payload.taskName ?? task.taskName
@@ -134,7 +128,10 @@ export default class TasksController {
         }
 
         try {
-            const task = await Task.query().where('id', params.id).where('user_id', user.id).firstOrFail()
+            const task = await Task.query()
+                                    .where('id', params.id)
+                                    .where('user_id', user.id)
+                                    .firstOrFail()
             await task.delete()
 
             return response.status(200).json({ message: 'Task Deleted' })

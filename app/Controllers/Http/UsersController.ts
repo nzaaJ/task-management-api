@@ -1,19 +1,16 @@
 import type { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
-import { schema, rules } from '@ioc:Adonis/Core/Validator'
+import UserValidator from 'App/Validators/UserValidator'
 import User from 'App/Models/User'
 
 export default class UsersController {
 
-  private registerValidationSchema = schema.create({
-    email: schema.string({}, [rules.email(), rules.unique({table: 'users', column: 'email'})]),
-    password: schema.string({}, [rules.confirmed()])
-  })
-
-
     public async register({ request, response }: HttpContextContract) {
+        const payload = await request.validate({ 
+            schema: UserValidator.registerSchema,
+            messages: UserValidator.messages
+        })
+        
         try {
-            const payload = await request.validate({ schema: this.registerValidationSchema })
-
             const user = new User()
             user.email = payload.email
             user.password = payload.password
@@ -27,7 +24,10 @@ export default class UsersController {
     }
 
     public async login({ auth, request, response }: HttpContextContract) {
-        const { email, password } = request.all()
+        const { email, password } = await request.validate({
+            schema: UserValidator.loginSchema,
+            messages: UserValidator.messages
+        })
 
         try {
             const token = await auth.attempt(email, password)
@@ -41,7 +41,7 @@ export default class UsersController {
         try {
             await auth.logout()
 
-            return response.status(200).json({ message: 'Logged out  successfully '})
+            return response.status(200).json({ message: 'Logged out successfully '})
         } catch {
             return response.status(500).json({ error: 'Error while logging out' })
         }
